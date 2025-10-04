@@ -1,4 +1,5 @@
-name = "nasa-hackathon"
-main = "worker/main.py"
-compatibility_flags = ["python_workers"]
-compatibility_date = "2025-08-14"
+name = "asteroid-simulator"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+[vars]
+NASA_API_KEY = "DEMO_KEY"
