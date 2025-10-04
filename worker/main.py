@@ -1,4 +1,4 @@
-from workers import WorkerEntrypoint, Response=
+from workers import WorkerEntrypoint, Response
 
 INDEX_PAGE = """
 <!DOCTYPE html>
