@@ -10,8 +10,8 @@
     #map { flex:1; }
     #sidebar { width:360px; padding:12px; box-shadow: -2px 0 6px rgba(0,0,0,0.12); background:#fff; overflow:auto; }
     .control { margin-bottom:10px; }
-    label{ font-weight:600; display:block; margin-bottom:4px; }
-    input[type=range]{ width:100%; }
+    label { font-weight:600; display:block; margin-bottom:4px; }
+    input[type=range] { width:100%; }
     .btn { padding:8px 12px; border:none; background:#0077cc; color:white; cursor:pointer; border-radius:4px; }
     .result { background:#f7f7f7; padding:8px; border-radius:6px; margin-top:8px; }
     .hint { font-size:12px; color:#666; margin-top:6px; }
@@ -21,14 +21,17 @@
   <div id="map"></div>
   <div id="sidebar">
     <h2>Meteor Madness — Demo</h2>
+
     <div class="control">
       <label>Diameter (m) <span id="diamLabel">50</span></label>
       <input id="diam" type="range" min="1" max="1000" value="50" />
     </div>
+
     <div class="control">
       <label>Velocity (km/s) <span id="velLabel">20</span></label>
       <input id="vel" type="range" min="5" max="40" value="20" />
     </div>
+
     <div class="control">
       <label>Deflection Δv (m/s) <span id="defLabel">0</span></label>
       <input id="def" type="range" min="0" max="2000" value="0" />
@@ -38,7 +41,7 @@
     <div class="control">
       <label>Water depth at impact (m)</label>
       <input id="depth" type="number" value="50" />
-      <div class="hint">Use coastal depths (e.g., 10-200) for nearshore, large numbers for deep ocean.</div>
+      <div class="hint">Use coastal depths (e.g., 10–200) for nearshore, large numbers for deep ocean.</div>
     </div>
 
     <div class="control">
@@ -59,7 +62,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Basic map
+    // 🌍 Setup map
     const map = L.map('map').setView([40.7, -74.0], 9);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18, attribution: '© OpenStreetMap'
@@ -69,35 +72,31 @@
     let impactCircle = null;
     let tsunamiCircle = null;
 
-    function updateMarker(latlng){
-      impactMarker.setLatLng(latlng);
-    }
-    map.on('click', function(e){
-      updateMarker(e.latlng);
-    });
+    map.on('click', e => impactMarker.setLatLng(e.latlng));
 
-    // UI bindings
-    const diam = document.getElementById('diam'), diamLabel = document.getElementById('diamLabel');
-    const vel = document.getElementById('vel'), velLabel = document.getElementById('velLabel');
-    const def = document.getElementById('def'), defLabel = document.getElementById('defLabel');
+    // 🎛 UI bindings
+    const diam = document.getElementById('diam');
+    const vel = document.getElementById('vel');
+    const def = document.getElementById('def');
     const depthInput = document.getElementById('depth');
-    diam.oninput = () => diamLabel.innerText = diam.value;
-    vel.oninput = () => velLabel.innerText = vel.value;
-    def.oninput = () => defLabel.innerText = def.value;
-
     const info = document.getElementById('info');
     const storyDiv = document.getElementById('story');
 
+    diam.oninput = () => document.getElementById('diamLabel').innerText = diam.value;
+    vel.oninput = () => document.getElementById('velLabel').innerText = vel.value;
+    def.oninput = () => document.getElementById('defLabel').innerText = def.value;
+
+    // 🚀 Simulate function
     async function simulate(){
       const latlng = impactMarker.getLatLng();
       const payload = {
-        diameter_m: Number(diam.value),
-        velocity_m_s: Number(vel.value) * 1000,
+        diameter_m: +diam.value,
+        velocity_m_s: +vel.value * 1000,
         density: 3000,
         impact_lat: latlng.lat,
         impact_lon: latlng.lng,
-        water_depth_m: Number(depthInput.value),
-        deflection_m_s: Number(def.value)
+        water_depth_m: +depthInput.value,
+        deflection_m_s: +def.value
       };
       info.innerText = "Simulating...";
       try {
@@ -109,16 +108,17 @@
         const data = await res.json();
         displayResults(data);
       } catch(err){
-        info.innerText = "Failed to contact backend. Run the Flask server and allow CORS / network access.";
+        info.innerText = "Failed to contact backend.";
         console.error(err);
       }
     }
 
+    // 🧮 Display results
     function displayResults(data){
       const r = data.results;
       info.innerHTML = `
-        <b>Mass:</b> ${(r.mass_kg).toExponential(3)} kg<br/>
-        <b>Energy:</b> ${(r.energy_joules).toExponential(3)} J<br/>
+        <b>Mass:</b> ${r.mass_kg.toExponential(3)} kg<br/>
+        <b>Energy:</b> ${r.energy_joules.toExponential(3)} J<br/>
         <b>TNT equiv:</b> ${r.tnt_megatons.toFixed(3)} megatons<br/>
         <b>Crater:</b> ${(r.crater_diameter_m/1000).toFixed(2)} km diameter<br/>
         <b>Seismic Mw (approx):</b> ${r.seismic_mw_equivalent.toFixed(2)}<br/>
@@ -126,68 +126,61 @@
         <b>Tsunami radius heuristic:</b> ${r.tsunami_radius_km.toFixed(0)} km
       `;
 
-      // Draw impact circle (crater) and tsunami circle (heuristic)
       if (impactCircle) map.removeLayer(impactCircle);
       if (tsunamiCircle) map.removeLayer(tsunamiCircle);
 
       const latlng = impactMarker.getLatLng();
-      const crater_km = r.crater_diameter_m / 1000.0;
-      impactCircle = L.circle(latlng, {radius: crater_km * 1000 / 2, color:'orangered', fill:false}).addTo(map);
-
-      const tsunami_km = Math.min(2000, r.tsunami_radius_km);
-      tsunamiCircle = L.circle(latlng, {radius: tsunami_km * 1000, color:'blue', fill:false, dashArray:'6 6'}).addTo(map);
+      impactCircle = L.circle(latlng, {radius: r.crater_diameter_m / 2, color:'orangered', fill:false}).addTo(map);
+      tsunamiCircle = L.circle(latlng, {radius: Math.min(2000, r.tsunami_radius_km) * 1000, color:'blue', fill:false, dashArray:'6 6'}).addTo(map);
 
       map.fitBounds(L.featureGroup([impactCircle, tsunamiCircle]).getBounds().pad(0.6));
-
-      // Request a story
       fetchStory({input: data.input, results: r});
     }
 
+    // 🧠 Fetch story
     async function fetchStory(sim){
       storyDiv.innerText = "Generating narrative...";
       try {
         const res = await fetch("https://ctrl-meteor.erickbm303.workers.dev/story", {
-          method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(sim)
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(sim)
         });
         const data = await res.json();
         storyDiv.innerText = data.story;
       } catch(err){
-        storyDiv.innerText = "Failed to generate narrative locally.";
+        storyDiv.innerText = "Failed to generate narrative.";
         console.error(err);
       }
     }
 
     document.getElementById('simulateBtn').addEventListener('click', simulate);
 
-    // Save to Cloudflare worker (example)
+    // ☁️ Save to Cloudflare Worker
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const latlng = impactMarker.getLatLng();
       const payload = {
-        diameter_m: Number(diam.value),
-        velocity_kms: Number(vel.value),
+        diameter_m: +diam.value,
+        velocity_kms: +vel.value,
         impact_lat: latlng.lat,
         impact_lon: latlng.lng,
         ts: Date.now()
       };
+
       try {
-        // Replace the URL with your deployed Cloudflare Worker URL
         const workerUrl = "https://ctrl-meteor.erickdamian-buitrago.workers.dev/save";
-        await fetch(workerUrl, {
+        const res = await fetch(workerUrl, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
           body: JSON.stringify(payload)
         });
-        alert("Saved to Cloudflare (if worker URL configured).");
+        const data = await res.json();
+        alert(`✅ Saved to Cloudflare! File: ${data.saved_as}`);
       } catch(e){
-        alert("Could not save to Cloudflare worker (replace worker URL).");
+        alert("❌ Could not save to Cloudflare worker. Check Worker URL or R2 binding.");
         console.error(e);
       }
     });
-
   </script>
 </body>
 </html>
-
-
-
-
