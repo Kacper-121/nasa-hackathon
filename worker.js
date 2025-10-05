@@ -129,6 +129,8 @@ async function handleSave(request, env) {
 }
 
 // ---------- MAIN ----------
+// worker.js — Cloudflare Worker for Asteroid Impact Simulator + R2 Save
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -138,25 +140,41 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    if (request.method === "OPTIONS") return new Response(null, { headers: cors });
+    // Handle CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: cors });
+    }
+
+    // Serve the HTML UI at the root
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      try {
+        return await env.ASSETS.fetch(request);
+      } catch (err) {
+        return new Response("index.html not found", { status: 404 });
+      }
+    }
+
+    // ----- API ROUTES -----
 
     if (url.pathname === "/simulate" && request.method === "POST") {
-      return new Response(JSON.stringify(await handleSimulate(request, env)), {
+      const result = await handleSimulate(request, env);
+      return new Response(JSON.stringify(result), {
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
     if (url.pathname === "/story" && request.method === "POST") {
-      return new Response(JSON.stringify(await handleStory(request)), {
+      const result = await handleStory(request, env);
+      return new Response(JSON.stringify(result), {
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
     if (url.pathname === "/save" && request.method === "POST") {
-      return await handleSave(request, env);
+      return await handleSave(request, env, cors);
     }
 
-    // Default / root
+    // Default / fallback route
     return new Response(
       JSON.stringify({
         message: "Asteroid Impact Simulator API",
@@ -166,3 +184,18 @@ export default {
     );
   },
 };
+
+// --- Example stubs for handlers (replace with your actual ones) ---
+async function handleSimulate(request, env) {
+  return { status: "ok", message: "Simulation processed" };
+}
+
+async function handleStory(request, env) {
+  return { story: "Meteor impact narrative generated." };
+}
+
+async function handleSave(request, env, cors) {
+  return new Response(JSON.stringify({ saved: true }), {
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
+}
