@@ -1,0 +1,14 @@
+name = "ctrl-meteor"
+main = "worker.js"
+compatibility_date = "2025-10-05"
+
+[vars]
+NASA_API_KEY = "$NASA_API_KEY"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "cosmosim-bucket"
+preview_bucket_name = "cosmosim-bucket-preview"
+
+[site]
+bucket = "./public"
