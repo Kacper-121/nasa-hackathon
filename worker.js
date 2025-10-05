@@ -1,6 +1,6 @@
 // worker.js — Cloudflare Worker for Asteroid Impact Simulator + Save Endpoint
 
-const NASA_KEY = "DEMO_KEY";
+const NASA_KEY = "DEMO_KEY"; 
 const NEO_LOOKUP_URL = "https://api.nasa.gov/neo/rest/v1/neo/";
 
 // ---------- Physics helpers ----------
@@ -64,25 +64,9 @@ async function handleSimulate(request, env) {
   const tsunamiR = Math.min(5000, 100 * Math.pow(Math.max(0.001, tnt), 0.25));
 
   return {
-    input: {
-      diameter_m: D,
-      velocity_m_s: v,
-      density: rho,
-      deflection_m_s: def,
-      impact_lat: data.impact_lat,
-      impact_lon: data.impact_lon,
-      water_depth_m: water,
-    },
-    results: {
-      mass_kg: m,
-      energy_joules: E,
-      tnt_megatons: tnt,
-      crater_diameter_m: crater,
-      seismic_mw_equivalent: mw,
-      tsunami_initial_height_m: tsunamiH,
-      tsunami_radius_km: tsunamiR,
-    },
-    notes: "Rough estimates for educational purposes.",
+    input: { diameter_m: D, velocity_m_s: v, density: rho, deflection_m_s: def, impact_lat: data.impact_lat, impact_lon: data.impact_lon, water_depth_m: water },
+    results: { mass_kg: m, energy_joules: E, tnt_megatons: tnt, crater_diameter_m: crater, seismic_mw_equivalent: mw, tsunami_initial_height_m: tsunamiH, tsunami_radius_km: tsunamiR },
+    notes: "Rough estimates for educational purposes."
   };
 }
 
@@ -109,19 +93,18 @@ async function handleSave(request, env) {
   try {
     const body = await request.json();
     const now = new Date();
-    const key = `impact_${now.toISOString().replace(/[:.]/g, "-")}_${Math.random()
-      .toString(36)
-      .slice(2, 8)}.json`;
+    const key = `impact_${now.toISOString().replace(/[:.]/g, "-")}_${Math.random().toString(36).slice(2, 8)}.json`;
 
+    // Ensure R2 binding exists
     if (!env.R2_BUCKET)
       return new Response(JSON.stringify({ error: "R2_BUCKET not configured" }), { status: 500 });
 
     await env.R2_BUCKET.put(key, JSON.stringify(body, null, 2), {
-      httpMetadata: { contentType: "application/json" },
+      httpMetadata: { contentType: "application/json" }
     });
 
     return new Response(JSON.stringify({ success: true, key }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
@@ -137,19 +120,14 @@ export default {
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
-
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
     if (url.pathname === "/simulate" && request.method === "POST") {
-      return new Response(JSON.stringify(await handleSimulate(request, env)), {
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify(await handleSimulate(request, env)), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
     if (url.pathname === "/story" && request.method === "POST") {
-      return new Response(JSON.stringify(await handleStory(request)), {
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify(await handleStory(request)), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
     if (url.pathname === "/save" && request.method === "POST") {
@@ -157,12 +135,8 @@ export default {
     }
 
     // Default / root
-    return new Response(
-      JSON.stringify({
-        message: "Asteroid Impact Simulator API",
-        endpoints: ["/simulate", "/story", "/save"],
-      }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ message: "Asteroid Impact Simulator API", endpoints: ["/simulate", "/story", "/save"] }), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
   },
 };
