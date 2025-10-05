@@ -1,4 +1,4 @@
-// worker.js — Cloudflare Worker for Asteroid Impact Simulator + Save Endpoint + AI Narration
+// worker.js — Cloudflare Worker for Asteroid Impact Simulator + Save Endpoint
 
 const NASA_KEY = "DEMO_KEY";
 const NEO_LOOKUP_URL = "https://api.nasa.gov/neo/rest/v1/neo/";
@@ -86,14 +86,13 @@ async function handleSimulate(request, env) {
   };
 }
 
-// ---------- /story (AI narrator) ----------
-async function handleStory(request, env) {
+// ---------- /story ----------
+async function handleStory(request) {
   const s = await request.json();
   const r = s.results || s;
-
   const lat = s.input?.impact_lat;
   const lon = s.input?.impact_lon;
-  const loc = lat && lon ? `at coordinates (${lat.toFixed(2)}, ${lon.toFixed(2)})` : "at an unspecified location";
+  const loc = lat && lon ? ` at (${lat.toFixed(2)}, ${lon.toFixed(2)})` : "";
 
   const tnt = r.tnt_megatons.toFixed(2);
   const craterKm = (r.crater_diameter_m / 1000).toFixed(2);
@@ -101,32 +100,8 @@ async function handleStory(request, env) {
   const tsunamiR = r.tsunami_radius_km.toFixed(0);
   const mw = r.seismic_mw_equivalent.toFixed(2);
 
-  // Prepare prompt
-  const prompt = `
-  You are a narrator for a scientific asteroid impact simulator.
-  Create a short 2-3 sentence narrative describing the event below in a realistic but accessible tone.
-
-  Impact details:
-  - Location: ${loc}
-  - Energy: ${tnt} megatons TNT
-  - Crater: ${craterKm} km
-  - Seismic magnitude: ${mw}
-  - Tsunami height: ${tsunamiH} m, reach: ${tsunamiR} km
-  `;
-
-  try {
-    const aiRes = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
-      prompt,
-      max_tokens: 120,
-    });
-
-    const text = aiRes?.response || "Narrator unavailable.";
-    return new Response(JSON.stringify({ story: text }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-  }
+  const text = `Impact${loc}: ${tnt} Mt TNT, crater ~${craterKm} km, magnitude ${mw}, tsunami height ${tsunamiH} m, reach ${tsunamiR} km.`;
+  return { story: text };
 }
 
 // ---------- /save ----------
@@ -172,13 +147,16 @@ export default {
     }
 
     if (url.pathname === "/story" && request.method === "POST") {
-      return await handleStory(request, env);
+      return new Response(JSON.stringify(await handleStory(request)), {
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
     }
 
     if (url.pathname === "/save" && request.method === "POST") {
       return await handleSave(request, env);
     }
 
+    // Default / root
     return new Response(
       JSON.stringify({
         message: "Asteroid Impact Simulator API",
@@ -188,4 +166,3 @@ export default {
     );
   },
 };
-
