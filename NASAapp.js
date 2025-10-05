@@ -200,6 +200,11 @@ export default {
     }
 
     // Default response for root or unknown paths
+    if (path === "/" && request.method === "GET") {
+      const html = await fetch("https://YOUR_GITHUB_OR_STATIC_URL/index.html").then(r => r.text());
+      return new Response(html, { headers: { "Content-Type": "text/html" } });
+    }
+    
     return new Response(
       JSON.stringify({ 
         message: "Asteroid Impact Simulator API",
@@ -211,3 +216,4 @@ export default {
     );
   }
 };
+
