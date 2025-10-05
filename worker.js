@@ -1,5 +1,5 @@
 // Cloudflare Worker for Asteroid Impact Simulator + R2 Save
-
+const NASA_KEY = "DEMO_KEY"; // fallback if env var not set
 const NEO_LOOKUP_URL = "https://api.nasa.gov/neo/rest/v1/neo/";
 
 // ---------- Physics helpers ----------
@@ -34,7 +34,7 @@ async function fetchNeoById(neoId, apiKey) {
 // ---------- Route Handlers ----------
 async function handleSimulate(request, env) {
   const data = await request.json();
-  const apiKey = env.NASA_API_KEY; // Secret from Cloudflare
+  const apiKey = env.NASA_API_KEY || NASA_KEY;
 
   if (data.neo_id) {
     const neo = await fetchNeoById(data.neo_id, apiKey);
@@ -60,35 +60,50 @@ async function handleSimulate(request, env) {
     input: { diameter_m: D, velocity_m_s: v, density: rho, deflection_m_s: deflection, impact_lat: data.impact_lat, impact_lon: data.impact_lon, water_depth_m: waterDepth },
     results: { mass_kg: mass, energy_joules: E, tnt_megatons: tntMt, crater_diameter_m: craterM, seismic_mw_equivalent: seismicMw, tsunami_initial_height_m: tsunamiH, tsunami_radius_km: tsunamiRadiusKm },
     notes: "All estimates are rough heuristics for demo/educational purposes."
-  }), {
-    status: 200,
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-  });
+  }), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }});
 }
 
-// ---------- Save simulation data to R2 ----------
 async function handleSave(request, env) {
   try {
     const data = await request.json();
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, "-");
-    const random = Math.random().toString(36).substring(2, 8);
-    const objectKey = `impact_${timestamp}_${random}.json`;
+    const timestamp = Date.now();
+    const objectKey = `impact_${timestamp}.json`;
 
-    await env.R2_BUCKET.put(objectKey, JSON.stringify(data, null, 2), {
+    await env.R2_BUCKET.put(objectKey, JSON.stringify(data), {
       httpMetadata: { contentType: "application/json" }
     });
 
-    return new Response(JSON.stringify({ success: true, key: objectKey }), { 
-      status: 200, 
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
+    return new Response(JSON.stringify({ success: true, key: objectKey }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { 
-      status: 500, 
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   }
+}
+
+async function handleStory(request) {
+  const s = await request.json();
+  const r = s.results || s;
+  const lat = s.input?.impact_lat || null;
+  const lon = s.input?.impact_lon || null;
+  const tnt = r.tnt_megatons;
+  const craterKm = (r.crater_diameter_m || 0) / 1000.0;
+  const tsunamiH = r.tsunami_initial_height_m;
+  const tsunamiRadius = r.tsunami_radius_km;
+  const mw = r.seismic_mw_equivalent;
+
+  const locationText = lat && lon ? ` at (${lat.toFixed(3)}, ${lon.toFixed(3)})` : "";
+  const para = `Impact simulation${locationText}: The asteroid would release approximately ` +
+    `${tnt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} megatons of TNT equivalent, producing an estimated crater about ` +
+    `${craterKm.toFixed(2)} km in diameter. The impact energy corresponds roughly to an earthquake of magnitude ${mw.toFixed(2)}. ` +
+    `If the impact occurs in water, our heuristic predicts an initial tsunami wave of about ${tsunamiH.toFixed(2)} meters ` +
+    `and potential coastal effects out to roughly ${tsunamiRadius.toFixed(0)} km from the source. These results are approximate and intended for education/demo only.`;
+
+  return { story: para };
 }
 
 // ---------- Main Worker Handler ----------
@@ -97,6 +112,11 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/simulate")) return handleSimulate(request, env);
     if (url.pathname.startsWith("/save")) return handleSave(request, env);
+    if (url.pathname.startsWith("/story")) return new Response(JSON.stringify(await handleStory(request)), { 
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+
     return new Response("Not Found", { status: 404 });
   }
 };
