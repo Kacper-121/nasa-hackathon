@@ -171,7 +171,7 @@
       };
       try {
         // Replace the URL with your deployed Cloudflare Worker URL
-        const workerUrl = "https://YOUR_WORKER.example.workers.dev/save_sim";
+        const workerUrl = "https://ctrl-meteor.erickbm303.workers.dev/save";
         await fetch(workerUrl, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
@@ -187,4 +187,5 @@
   </script>
 </body>
 </html>
+
 
