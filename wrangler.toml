@@ -9,6 +9,3 @@ NASA_API_KEY = "$NASA_API_KEY"
 binding = "R2_BUCKET"
 bucket_name = "cosmosim-bucket"
 preview_bucket_name = "cosmosim-bucket-preview"
-
-[[ai]]
-binding = "AI"
