@@ -95,7 +95,6 @@ async function handleSave(request, env) {
     const now = new Date();
     const key = `impact_${now.toISOString().replace(/[:.]/g, "-")}_${Math.random().toString(36).slice(2, 8)}.json`;
 
-    // Ensure R2 binding exists
     if (!env.R2_BUCKET)
       return new Response(JSON.stringify({ error: "R2_BUCKET not configured" }), { status: 500 });
 
@@ -134,7 +133,6 @@ export default {
       return await handleSave(request, env);
     }
 
-    // Default / root
     return new Response(JSON.stringify({ message: "Asteroid Impact Simulator API", endpoints: ["/simulate", "/story", "/save"] }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
