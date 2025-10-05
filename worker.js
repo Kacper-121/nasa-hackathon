@@ -195,7 +195,7 @@ export default {
 
     // Serve index.html on root path
     if (path === "/" && request.method === "GET") {
-      const html = await fetch("https://YOUR_GITHUB_OR_STATIC_URL/index.html").then(r => r.text());
+      const html = await fetch("https://erickbm303.github.io/nasa-hackathon-fork/").then(r => r.text());
       return new Response(html, { headers: { "Content-Type": "text/html" } });
     }
 
@@ -209,3 +209,4 @@ export default {
     );
   }
 };
+
