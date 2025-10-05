@@ -1,141 +1,113 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Meteor Impact Simulator</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-  body{margin:0;font-family:Arial,sans-serif;display:flex;height:100vh;}
-  #map{flex:1;}
-  #sidebar{width:360px;padding:12px;box-shadow:-2px 0 6px rgba(0,0,0,0.12);background:#fff;overflow:auto;}
-  .control{margin-bottom:10px;} label{font-weight:600;display:block;margin-bottom:4px;}
-  input[type=range]{width:100%;}
-  .btn{padding:8px 12px;border:none;background:#0077cc;color:white;cursor:pointer;border-radius:4px;}
-  .btn.secondary{background:#2b8a3e;}
-  .result{background:#f7f7f7;padding:8px;border-radius:6px;margin-top:8px;}
-  .hint{font-size:12px;color:#666;margin-top:6px;}
-</style>
+  <meta charset="utf-8" />
+  <title>Meteor Impact + Earthquake & Tsunami Interface</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="sidebar">
+    <h2>Meteor Impact Simulator</h2>
+    <div class="sub">NEOs → simulate impact → draw crater & tsunami → overlay earthquakes & tsunami history → list nearby cities.</div>
 
-<div id="map"></div>
-<div id="sidebar">
-<h2>Meteor Impact Simulator</h2>
+    <div class="card">
+      <label>Cloudflare Worker URL</label>
+      <input id="workerUrl" type="text" value="https://ctrl-meteor.erickbm303.workers.dev" placeholder="https://&lt;your-worker&gt;.workers.dev" />
+      <div class="muted">Must expose: <span class="pill">/simulate</span> <span class="pill">/story</span> <span class="pill">/save</span></div>
+    </div>
 
-<div class="control">
-  <label>Cloudflare Worker URL</label>
-  <input id="workerUrl" type="text" value="https://ctrl-meteor.erickbm303.workers.dev">
-  <div class="hint">Must expose: /simulate /story /save</div>
-</div>
+    <div class="card">
+      <label>Upload Data Files</label>
+      <div class="dropzone">
+        <div class="dz">
+          <div class="muted">NEO (5 highlighted)</div>
+          <input id="neoCsv" type="file" accept=".csv" />
+        </div>
+        <div class="dz">
+          <div class="muted">Earthquakes</div>
+          <input id="quakesCsv" type="file" accept=".csv" />
+        </div>
+        <div class="dz">
+          <div class="muted">Tsunamis (B,C,D,O,P,Q)</div>
+          <input id="tsunamiCsv" type="file" accept=".csv" />
+        </div>
+      </div>
+      <div id="loadStatus" class="muted" style="margin-top:8px">No files loaded.</div>
+    </div>
 
-<div class="control">
-  <label>Diameter (m) <span id="diamLabel">50</span></label>
-  <input id="diam" type="range" min="1" max="1000" value="50">
-</div>
-<div class="control">
-  <label>Velocity (km/s) <span id="velLabel">20</span></label>
-  <input id="vel" type="range" min="5" max="40" value="20">
-</div>
-<div class="control">
-  <label>Deflection Δv (m/s) <span id="defLabel">0</span></label>
-  <input id="def" type="range" min="0" max="2000" value="0">
-</div>
-<div class="control">
-  <label>Water Depth (m)</label>
-  <input id="depth" type="number" value="50">
-</div>
-<div class="control">
-  <button id="simulateBtn" class="btn">Simulate Impact</button>
-  <button id="saveBtn" class="btn secondary">Save</button>
-</div>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Select Meteor</label>
+          <select id="meteorSelect"><option value="">— load NEO CSV —</option></select>
+        </div>
+        <div>
+          <label>Impact Radius (km)</label>
+          <input id="radiusKm" type="number" min="1" value="300" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Water Depth (m)</label>
+          <input id="waterDepth" type="number" min="0" value="50" />
+        </div>
+        <div>
+          <label>Deflection Δv (m/s)</label>
+          <input id="deflection" type="number" min="0" value="0" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Density (kg/m³)</label>
+          <input id="density" type="number" min="100" value="3000" />
+        </div>
+        <div class="stack" style="align-items:flex-end">
+          <button id="simulateBtn" class="btn">Simulate</button>
+          <button id="saveBtn" class="btn secondary">Save</button>
+        </div>
+      </div>
+      <div class="legend" style="margin-top:10px">
+        <span><span class="sw crater"></span>Crater radius</span>
+        <span><span class="sw tsu"></span>Tsunami radius</span>
+        <span><span class="sw quake"></span>Earthquakes</span>
+        <span><span class="sw tsunamiEvt"></span>Tsunami events</span>
+        <span><span class="sw city"></span>Cities</span>
+        <span><span class="sw impact"></span>Impact point</span>
+      </div>
+    </div>
 
-<div id="info" class="result">No simulation yet.</div>
-<div id="story" class="result">No story yet.</div>
+    <div class="card result" id="resultsBox">No simulation yet. Click map to set impact point, choose a meteor, then press <b>Simulate</b>.</div>
+    <div class="card result" id="compareBox">No tsunami comparison yet.</div>
 
-</div>
+    <details class="card" open>
+      <summary>Narrative</summary>
+      <div id="storyBox" class="muted">—</div>
+    </details>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const map = L.map('map').setView([40.7, -74.0], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+    <details class="card">
+      <summary>Earthquakes within radius</summary>
+      <div id="quakeSummary" class="muted">—</div>
+      <div id="quakeList" class="list"></div>
+    </details>
 
-let impactMarker = L.circleMarker([40.7, -74.0],{radius:7,color:'red',weight:2}).addTo(map);
-let impactCircle=null, tsunamiCircle=null;
+    <details class="card">
+      <summary>Tsunamis within radius</summary>
+      <div id="tsuSummary" class="muted">—</div>
+      <div id="tsuList" class="list"></div>
+    </details>
 
-map.on('click',e=>impactMarker.setLatLng(e.latlng));
+    <details class="card">
+      <summary>Cities impacted (≥2 per continent)</summary>
+      <div id="citySummary" class="muted">—</div>
+      <div id="cityList" class="list"></div>
+    </details>
+  </div>
 
-const diam = document.getElementById('diam'), diamLabel = document.getElementById('diamLabel');
-const vel = document.getElementById('vel'), velLabel = document.getElementById('velLabel');
-const def = document.getElementById('def'), defLabel = document.getElementById('defLabel');
-const depthInput = document.getElementById('depth');
-diam.oninput = ()=>diamLabel.innerText=diam.value;
-vel.oninput = ()=>velLabel.innerText=vel.value;
-def.oninput = ()=>defLabel.innerText=def.value;
+  <div id="map"></div>
 
-const info = document.getElementById('info');
-const storyDiv = document.getElementById('story');
-
-async function simulate(){
-  const base=document.getElementById('workerUrl').value.replace(/\/+$/,'');
-  const latlng = impactMarker.getLatLng();
-  const payload = {
-    diameter_m: Number(diam.value),
-    velocity_m_s: Number(vel.value)*1000,
-    density: 3000,
-    impact_lat: latlng.lat,
-    impact_lon: latlng.lng,
-    water_depth_m: Number(depthInput.value),
-    deflection_m_s: Number(def.value)
-  };
-  info.innerText = "Simulating...";
-  try{
-    const res=await fetch(base+'/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const data=await res.json(); displayResults(data);
-  }catch(e){ info.innerText='Simulation failed.'; console.error(e); }
-}
-
-function displayResults(d){
-  const r=d.results;
-  info.innerHTML = `
-    <b>Mass:</b> ${r.mass_kg?.toExponential(3)} kg<br/>
-    <b>Energy:</b> ${r.energy_joules?.toExponential(3)} J<br/>
-    <b>TNT equiv:</b> ${r.tnt_megatons.toFixed(2)} Mt<br/>
-    <b>Crater:</b> ${(r.crater_diameter_m/1000).toFixed(2)} km<br/>
-    <b>Seismic Mw:</b> ${r.seismic_mw_equivalent.toFixed(2)}<br/>
-    <b>Tsunami height:</b> ${r.tsunami_initial_height_m.toFixed(2)} m<br/>
-    <b>Tsunami radius:</b> ${r.tsunami_radius_km.toFixed(0)} km
-  `;
-
-  if(impactCircle) map.removeLayer(impactCircle);
-  if(tsunamiCircle) map.removeLayer(tsunamiCircle);
-  const latlng = impactMarker.getLatLng();
-  const crater_km = r.crater_diameter_m/1000;
-  impactCircle=L.circle(latlng,{radius:crater_km*1000/2,color:'orangered',fill:false}).addTo(map);
-  tsunamiCircle=L.circle(latlng,{radius:r.tsunami_radius_km*1000,color:'blue',fill:false,dashArray:'6 6'}).addTo(map);
-
-  map.fitBounds(L.featureGroup([impactCircle,tsunamiCircle]).getBounds().pad(0.6));
-
-  fetchStory({input:d.input,results:r});
-}
-
-async function fetchStory(sim){
-  storyDiv.innerText="Generating narrative...";
-  try{
-    const base=document.getElementById('workerUrl').value.replace(/\/+$/,'');
-    const res=await fetch(base+'/story',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sim)});
-    const j=await res.json(); storyDiv.innerText=j.story;
-  }catch(e){ storyDiv.innerText='Story failed.'; console.error(e);}
-}
-
-document.getElementById('simulateBtn').addEventListener('click',simulate);
-document.getElementById('saveBtn').addEventListener('click',async()=>{
-  const base=document.getElementById('workerUrl').value.replace(/\/+$/,'');
-  const latlng=impactMarker.getLatLng();
-  const payload={diameter_m:Number(diam.value),velocity_m_s:Number(vel.value)*1000,impact_lat:latlng.lat,impact_lon:latlng.lng,ts:Date.now()};
-  try{await fetch(base+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); alert('Saved to Cloudflare.');}
-  catch(e){alert('Save failed.');console.error(e);}
-});
-</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
