@@ -183,31 +183,30 @@ export default {
       const response = await handleSimulate(request, env);
       const newHeaders = new Headers(response.headers);
       Object.entries(corsHeaders).forEach(([k, v]) => newHeaders.set(k, v));
-      return new Response(response.body, {
-        status: response.status,
-        headers: newHeaders
-      });
+      return new Response(response.body, { status: response.status, headers: newHeaders });
     }
 
     if (path === '/story' && request.method === 'POST') {
       const response = await handleStory(request);
       const newHeaders = new Headers(response.headers);
       Object.entries(corsHeaders).forEach(([k, v]) => newHeaders.set(k, v));
-      return new Response(response.body, {
-        status: response.status,
-        headers: newHeaders
-      });
+      return new Response(response.body, { status: response.status, headers: newHeaders });
     }
 
-    // Default response for root or unknown paths
+    // Serve index.html on root path
+    if (path === "/" && request.method === "GET") {
+      const html = await fetch("https://erickbm303.github.io/nasa-hackathon-fork/").then(r => r.text());
+      return new Response(html, { headers: { "Content-Type": "text/html" } });
+    }
+
+    // Default JSON response
     return new Response(
       JSON.stringify({ 
         message: "Asteroid Impact Simulator API",
         endpoints: ["/simulate (POST)", "/story (POST)"]
       }), 
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 };
+

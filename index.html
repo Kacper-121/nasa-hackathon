@@ -101,7 +101,7 @@
       };
       info.innerText = "Simulating...";
       try {
-        const res = await fetch("http://127.0.0.1:5000/simulate", {
+        const res = await fetch("https://ctrl-meteor.erickbm303.workers.dev/simulate", {
           method: "POST",
           headers: {"Content-Type":"application/json"},
           body: JSON.stringify(payload)
@@ -146,7 +146,7 @@
     async function fetchStory(sim){
       storyDiv.innerText = "Generating narrative...";
       try {
-        const res = await fetch("http://127.0.0.1:5000/story", {
+        const res = await fetch("https://ctrl-meteor.erickbm303.workers.dev/story", {
           method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(sim)
         });
         const data = await res.json();
@@ -187,3 +187,4 @@
   </script>
 </body>
 </html>
+
