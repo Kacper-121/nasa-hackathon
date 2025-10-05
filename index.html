@@ -170,21 +170,18 @@
         ts: Date.now()
       };
       try {
-        // Replace the URL with your deployed Cloudflare Worker URL
         const workerUrl = "https://ctrl-meteor.erickbm303.workers.dev/save";
         await fetch(workerUrl, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
           body: JSON.stringify(payload)
         });
-        alert("Saved to Cloudflare (if worker URL configured).");
+        alert("Saved to Cloudflare.");
       } catch(e){
         alert("Could not save to Cloudflare worker (replace worker URL).");
         console.error(e);
       }
     });
-
   </script>
 </body>
 </html>
-
