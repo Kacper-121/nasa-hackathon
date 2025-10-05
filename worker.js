@@ -64,22 +64,51 @@ async function handleSimulate(request, env) {
   };
 }
 
-// Save simulation data to R2
+// ---------- Save simulation data to R2 ----------
 async function handleSave(request, env) {
   try {
     const data = await request.json();
     const timestamp = Date.now();
     const objectKey = `impact_${timestamp}.json`;
 
-    // Save to R2
     await env.R2_BUCKET.put(objectKey, JSON.stringify(data), {
       httpMetadata: { contentType: "application/json" }
     });
 
-    return new Response(JSON.stringify({ success: true, key: objectKey }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, key: objectKey }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
+    });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: e.message }), { 
+      status: 500, 
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
+    });
   }
+}
+
+// ---------- Generate story text ----------
+async function handleStory(request) {
+  const s = await request.json();
+  const r = s.results || s;
+  const lat = s.input?.impact_lat || null;
+  const lon = s.input?.impact_lon || null;
+
+  const tnt = r.tnt_megatons;
+  const craterKm = (r.crater_diameter_m || 0) / 1000.0;
+  const tsunamiH = r.tsunami_initial_height_m;
+  const tsunamiRadius = r.tsunami_radius_km;
+  const mw = r.seismic_mw_equivalent;
+
+  const locationText = lat && lon ? ` at (${lat.toFixed(3)}, ${lon.toFixed(3)})` : "";
+  const para = `Impact simulation${locationText}: The asteroid would release approximately ` +
+    `${tnt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} megatons of TNT equivalent, producing an estimated crater about ` +
+    `${craterKm.toFixed(2)} km in diameter. The impact energy corresponds roughly to an earthquake ` +
+    `of magnitude ${mw.toFixed(2)}. If the impact occurs in water, our heuristic predicts an initial ` +
+    `tsunami wave of about ${tsunamiH.toFixed(2)} meters and potential coastal effects out to roughly ` +
+    `${tsunamiRadius.toFixed(0)} km from the source. These results are approximate and intended for education/demo only.`;
+
+  return { story: para };
 }
 
 // ---------- Main Worker Handler ----------
@@ -88,8 +117,14 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
-    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    const corsHeaders = { 
+      'Access-Control-Allow-Origin': '*', 
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 
+      'Access-Control-Allow-Headers': 'Content-Type' 
+    };
+
+    if (request.method === "OPTIONS") 
+      return new Response(null, { headers: corsHeaders });
 
     if (path === "/simulate" && request.method === "POST") {
       const resp = await handleSimulate(request, env);
@@ -110,6 +145,9 @@ export default {
       return new Response(html, { headers: { "Content-Type": "text/html" } });
     }
 
-    return new Response(JSON.stringify({ message: "Asteroid Impact Simulator API", endpoints: ["/simulate (POST)", "/story (POST)", "/save (POST)"] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ 
+      message: "Asteroid Impact Simulator API", 
+      endpoints: ["/simulate (POST)", "/story (POST)", "/save (POST)"] 
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 };
