@@ -1,187 +1,141 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Meteor Madness — Demo</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    body { margin:0; font-family: Arial, sans-serif; display:flex; height:100vh; }
-    #map { flex:1; }
-    #sidebar { width:360px; padding:12px; box-shadow: -2px 0 6px rgba(0,0,0,0.12); background:#fff; overflow:auto; }
-    .control { margin-bottom:10px; }
-    label{ font-weight:600; display:block; margin-bottom:4px; }
-    input[type=range]{ width:100%; }
-    .btn { padding:8px 12px; border:none; background:#0077cc; color:white; cursor:pointer; border-radius:4px; }
-    .result { background:#f7f7f7; padding:8px; border-radius:6px; margin-top:8px; }
-    .hint { font-size:12px; color:#666; margin-top:6px; }
-  </style>
+<meta charset="utf-8">
+<title>Meteor Impact Simulator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  body{margin:0;font-family:Arial,sans-serif;display:flex;height:100vh;}
+  #map{flex:1;}
+  #sidebar{width:360px;padding:12px;box-shadow:-2px 0 6px rgba(0,0,0,0.12);background:#fff;overflow:auto;}
+  .control{margin-bottom:10px;} label{font-weight:600;display:block;margin-bottom:4px;}
+  input[type=range]{width:100%;}
+  .btn{padding:8px 12px;border:none;background:#0077cc;color:white;cursor:pointer;border-radius:4px;}
+  .btn.secondary{background:#2b8a3e;}
+  .result{background:#f7f7f7;padding:8px;border-radius:6px;margin-top:8px;}
+  .hint{font-size:12px;color:#666;margin-top:6px;}
+</style>
 </head>
 <body>
-  <div id="map"></div>
-  <div id="sidebar">
-    <h2>Meteor Madness — Demo</h2>
-    <div class="control">
-      <label>Diameter (m) <span id="diamLabel">50</span></label>
-      <input id="diam" type="range" min="1" max="1000" value="50" />
-    </div>
-    <div class="control">
-      <label>Velocity (km/s) <span id="velLabel">20</span></label>
-      <input id="vel" type="range" min="5" max="40" value="20" />
-    </div>
-    <div class="control">
-      <label>Deflection Δv (m/s) <span id="defLabel">0</span></label>
-      <input id="def" type="range" min="0" max="2000" value="0" />
-      <div class="hint">Simulate a small deflection; larger Δv may shift impact. (demo heuristic)</div>
-    </div>
 
-    <div class="control">
-      <label>Water depth at impact (m)</label>
-      <input id="depth" type="number" value="50" />
-      <div class="hint">Use coastal depths (e.g., 10-200) for nearshore, large numbers for deep ocean.</div>
-    </div>
+<div id="map"></div>
+<div id="sidebar">
+<h2>Meteor Impact Simulator</h2>
 
-    <div class="control">
-      <button id="simulateBtn" class="btn">Simulate Impact</button>
-      <button id="saveBtn" class="btn" style="background:#2b8a3e">Save (Cloudflare)</button>
-      <div class="hint">Click map to set impact point. Default: near NYC.</div>
-    </div>
+<div class="control">
+  <label>Cloudflare Worker URL</label>
+  <input id="workerUrl" type="text" value="https://ctrl-meteor.erickbm303.workers.dev">
+  <div class="hint">Must expose: /simulate /story /save</div>
+</div>
 
-    <div id="info" class="result">No simulation yet.</div>
-    <h4>Narrative</h4>
-    <div id="story" class="result">No story yet.</div>
+<div class="control">
+  <label>Diameter (m) <span id="diamLabel">50</span></label>
+  <input id="diam" type="range" min="1" max="1000" value="50">
+</div>
+<div class="control">
+  <label>Velocity (km/s) <span id="velLabel">20</span></label>
+  <input id="vel" type="range" min="5" max="40" value="20">
+</div>
+<div class="control">
+  <label>Deflection Δv (m/s) <span id="defLabel">0</span></label>
+  <input id="def" type="range" min="0" max="2000" value="0">
+</div>
+<div class="control">
+  <label>Water Depth (m)</label>
+  <input id="depth" type="number" value="50">
+</div>
+<div class="control">
+  <button id="simulateBtn" class="btn">Simulate Impact</button>
+  <button id="saveBtn" class="btn secondary">Save</button>
+</div>
 
-    <h4>Notes</h4>
-    <div class="hint">
-      All numbers are approximate heuristics for demo/education. Real tsunami and orbital models require specialized simulation.
-    </div>
-  </div>
+<div id="info" class="result">No simulation yet.</div>
+<div id="story" class="result">No story yet.</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // Basic map
-    const map = L.map('map').setView([40.7, -74.0], 9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18, attribution: '© OpenStreetMap'
-    }).addTo(map);
+</div>
 
-    let impactMarker = L.circleMarker([40.67, -74.0], {radius:6, color:'red'}).addTo(map);
-    let impactCircle = null;
-    let tsunamiCircle = null;
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([40.7, -74.0], 4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
 
-    function updateMarker(latlng){
-      impactMarker.setLatLng(latlng);
-    }
-    map.on('click', function(e){
-      updateMarker(e.latlng);
-    });
+let impactMarker = L.circleMarker([40.7, -74.0],{radius:7,color:'red',weight:2}).addTo(map);
+let impactCircle=null, tsunamiCircle=null;
 
-    // UI bindings
-    const diam = document.getElementById('diam'), diamLabel = document.getElementById('diamLabel');
-    const vel = document.getElementById('vel'), velLabel = document.getElementById('velLabel');
-    const def = document.getElementById('def'), defLabel = document.getElementById('defLabel');
-    const depthInput = document.getElementById('depth');
-    diam.oninput = () => diamLabel.innerText = diam.value;
-    vel.oninput = () => velLabel.innerText = vel.value;
-    def.oninput = () => defLabel.innerText = def.value;
+map.on('click',e=>impactMarker.setLatLng(e.latlng));
 
-    const info = document.getElementById('info');
-    const storyDiv = document.getElementById('story');
+const diam = document.getElementById('diam'), diamLabel = document.getElementById('diamLabel');
+const vel = document.getElementById('vel'), velLabel = document.getElementById('velLabel');
+const def = document.getElementById('def'), defLabel = document.getElementById('defLabel');
+const depthInput = document.getElementById('depth');
+diam.oninput = ()=>diamLabel.innerText=diam.value;
+vel.oninput = ()=>velLabel.innerText=vel.value;
+def.oninput = ()=>defLabel.innerText=def.value;
 
-    async function simulate(){
-      const latlng = impactMarker.getLatLng();
-      const payload = {
-        diameter_m: Number(diam.value),
-        velocity_m_s: Number(vel.value) * 1000,
-        density: 3000,
-        impact_lat: latlng.lat,
-        impact_lon: latlng.lng,
-        water_depth_m: Number(depthInput.value),
-        deflection_m_s: Number(def.value)
-      };
-      info.innerText = "Simulating...";
-      try {
-        const res = await fetch("https://ctrl-meteor.erickbm303.workers.dev/simulate", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        displayResults(data);
-      } catch(err){
-        info.innerText = "Failed to contact backend. Run the Flask server and allow CORS / network access.";
-        console.error(err);
-      }
-    }
+const info = document.getElementById('info');
+const storyDiv = document.getElementById('story');
 
-    function displayResults(data){
-      const r = data.results;
-      info.innerHTML = `
-        <b>Mass:</b> ${(r.mass_kg).toExponential(3)} kg<br/>
-        <b>Energy:</b> ${(r.energy_joules).toExponential(3)} J<br/>
-        <b>TNT equiv:</b> ${r.tnt_megatons.toFixed(3)} megatons<br/>
-        <b>Crater:</b> ${(r.crater_diameter_m/1000).toFixed(2)} km diameter<br/>
-        <b>Seismic Mw (approx):</b> ${r.seismic_mw_equivalent.toFixed(2)}<br/>
-        <b>Initial tsunami (heuristic):</b> ${r.tsunami_initial_height_m.toFixed(2)} m<br/>
-        <b>Tsunami radius heuristic:</b> ${r.tsunami_radius_km.toFixed(0)} km
-      `;
+async function simulate(){
+  const base=document.getElementById('workerUrl').value.replace(/\/+$/,'');
+  const latlng = impactMarker.getLatLng();
+  const payload = {
+    diameter_m: Number(diam.value),
+    velocity_m_s: Number(vel.value)*1000,
+    density: 3000,
+    impact_lat: latlng.lat,
+    impact_lon: latlng.lng,
+    water_depth_m: Number(depthInput.value),
+    deflection_m_s: Number(def.value)
+  };
+  info.innerText = "Simulating...";
+  try{
+    const res=await fetch(base+'/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json(); displayResults(data);
+  }catch(e){ info.innerText='Simulation failed.'; console.error(e); }
+}
 
-      // Draw impact circle (crater) and tsunami circle (heuristic)
-      if (impactCircle) map.removeLayer(impactCircle);
-      if (tsunamiCircle) map.removeLayer(tsunamiCircle);
+function displayResults(d){
+  const r=d.results;
+  info.innerHTML = `
+    <b>Mass:</b> ${r.mass_kg?.toExponential(3)} kg<br/>
+    <b>Energy:</b> ${r.energy_joules?.toExponential(3)} J<br/>
+    <b>TNT equiv:</b> ${r.tnt_megatons.toFixed(2)} Mt<br/>
+    <b>Crater:</b> ${(r.crater_diameter_m/1000).toFixed(2)} km<br/>
+    <b>Seismic Mw:</b> ${r.seismic_mw_equivalent.toFixed(2)}<br/>
+    <b>Tsunami height:</b> ${r.tsunami_initial_height_m.toFixed(2)} m<br/>
+    <b>Tsunami radius:</b> ${r.tsunami_radius_km.toFixed(0)} km
+  `;
 
-      const latlng = impactMarker.getLatLng();
-      const crater_km = r.crater_diameter_m / 1000.0;
-      impactCircle = L.circle(latlng, {radius: crater_km * 1000 / 2, color:'orangered', fill:false}).addTo(map);
+  if(impactCircle) map.removeLayer(impactCircle);
+  if(tsunamiCircle) map.removeLayer(tsunamiCircle);
+  const latlng = impactMarker.getLatLng();
+  const crater_km = r.crater_diameter_m/1000;
+  impactCircle=L.circle(latlng,{radius:crater_km*1000/2,color:'orangered',fill:false}).addTo(map);
+  tsunamiCircle=L.circle(latlng,{radius:r.tsunami_radius_km*1000,color:'blue',fill:false,dashArray:'6 6'}).addTo(map);
 
-      const tsunami_km = Math.min(2000, r.tsunami_radius_km);
-      tsunamiCircle = L.circle(latlng, {radius: tsunami_km * 1000, color:'blue', fill:false, dashArray:'6 6'}).addTo(map);
+  map.fitBounds(L.featureGroup([impactCircle,tsunamiCircle]).getBounds().pad(0.6));
 
-      map.fitBounds(L.featureGroup([impactCircle, tsunamiCircle]).getBounds().pad(0.6));
+  fetchStory({input:d.input,results:r});
+}
 
-      // Request a story
-      fetchStory({input: data.input, results: r});
-    }
+async function fetchStory(sim){
+  storyDiv.innerText="Generating narrative...";
+  try{
+    const base=document.getElementById('workerUrl').value.replace(/\/+$/,'');
+    const res=await fetch(base+'/story',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sim)});
+    const j=await res.json(); storyDiv.innerText=j.story;
+  }catch(e){ storyDiv.innerText='Story failed.'; console.error(e);}
+}
 
-    async function fetchStory(sim){
-      storyDiv.innerText = "Generating narrative...";
-      try {
-        const res = await fetch("https://ctrl-meteor.erickbm303.workers.dev/story", {
-          method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(sim)
-        });
-        const data = await res.json();
-        storyDiv.innerText = data.story;
-      } catch(err){
-        storyDiv.innerText = "Failed to generate narrative locally.";
-        console.error(err);
-      }
-    }
-
-    document.getElementById('simulateBtn').addEventListener('click', simulate);
-
-    // Save to Cloudflare worker (example)
-    document.getElementById('saveBtn').addEventListener('click', async () => {
-      const latlng = impactMarker.getLatLng();
-      const payload = {
-        diameter_m: Number(diam.value),
-        velocity_kms: Number(vel.value),
-        impact_lat: latlng.lat,
-        impact_lon: latlng.lng,
-        ts: Date.now()
-      };
-      try {
-        const workerUrl = "https://ctrl-meteor.erickbm303.workers.dev/save";
-        await fetch(workerUrl, {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(payload)
-        });
-        alert("Saved to Cloudflare.");
-      } catch(e){
-        alert("Could not save to Cloudflare worker (replace worker URL).");
-        console.error(e);
-      }
-    });
-  </script>
+document.getElementById('simulateBtn').addEventListener('click',simulate);
+document.getElementById('saveBtn').addEventListener('click',async()=>{
+  const base=document.getElementById('workerUrl').value.replace(/\/+$/,'');
+  const latlng=impactMarker.getLatLng();
+  const payload={diameter_m:Number(diam.value),velocity_m_s:Number(vel.value)*1000,impact_lat:latlng.lat,impact_lon:latlng.lng,ts:Date.now()};
+  try{await fetch(base+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); alert('Saved to Cloudflare.');}
+  catch(e){alert('Save failed.');console.error(e);}
+});
+</script>
 </body>
 </html>
