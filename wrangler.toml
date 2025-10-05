@@ -1,5 +1,5 @@
 name = "asteroid-simulator"
-main = "NASAapp.js"
+main = "worker.js"
 compatibility_date = "2024-01-01"
 [vars]
 NASA_API_KEY = "DEMO_KEY"
