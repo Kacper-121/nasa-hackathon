@@ -1,4 +1,4 @@
-name = "asteroid-simulator"
+name = "ctrl-meteor"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 [vars]
