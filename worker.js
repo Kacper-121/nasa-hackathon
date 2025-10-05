@@ -1,6 +1,6 @@
-// worker.js — Cloudflare Worker for Asteroid Impact Simulator + R2 Save
+// worker.js — Cloudflare Worker for Asteroid Impact Simulator + Save Endpoint
 
-const NASA_KEY = "DEMO_KEY"; // fallback key
+const NASA_KEY = "DEMO_KEY"; 
 const NEO_LOOKUP_URL = "https://api.nasa.gov/neo/rest/v1/neo/";
 
 // ---------- Physics helpers ----------
@@ -27,12 +27,12 @@ function tsunamiInitialWaveHeightM(eJoules, waterDepthM = 4000.0) {
   return Math.max(0.01, Math.min(0.5 * scale * depthFactor, 200.0));
 }
 
-// ---------- NASA helper ----------
+// ---------- NASA NEO Lookup ----------
 async function fetchNeoById(neoId, apiKey) {
   try {
-    const res = await fetch(`${NEO_LOOKUP_URL}${neoId}?api_key=${apiKey}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const response = await fetch(`${NEO_LOOKUP_URL}${neoId}?api_key=${apiKey}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
   } catch (e) {
     return { error: e.message };
   }
@@ -51,77 +51,70 @@ async function handleSimulate(request, env) {
   const D = parseFloat(data.diameter_m || 50);
   const v = parseFloat(data.velocity_m_s || 20000);
   const rho = parseFloat(data.density || 3000);
-  const waterDepth = parseFloat(data.water_depth_m || 4000);
-  const deflection = parseFloat(data.deflection_m_s || 0);
+  const def = parseFloat(data.deflection_m_s || 0);
+  const water = parseFloat(data.water_depth_m || 4000);
+  const vEff = Math.max(0, v - def);
 
-  const vEff = Math.max(0, v - deflection);
   const m = sphereMass(D, rho);
   const E = kineticEnergyJoules(m, vEff);
   const tnt = tntEquivalentMegatons(E);
   const crater = craterDiameterEstimateM(E);
   const mw = seismicMwEquivalent(E);
-  const tsunamiH = tsunamiInitialWaveHeightM(E, waterDepth);
+  const tsunamiH = tsunamiInitialWaveHeightM(E, water);
   const tsunamiR = Math.min(5000, 100 * Math.pow(Math.max(0.001, tnt), 0.25));
 
   return {
-    input: { diameter_m: D, velocity_m_s: v, density: rho, deflection_m_s: deflection, water_depth_m: waterDepth, impact_lat: data.impact_lat, impact_lon: data.impact_lon },
+    input: { diameter_m: D, velocity_m_s: v, density: rho, deflection_m_s: def, impact_lat: data.impact_lat, impact_lon: data.impact_lon, water_depth_m: water },
     results: { mass_kg: m, energy_joules: E, tnt_megatons: tnt, crater_diameter_m: crater, seismic_mw_equivalent: mw, tsunami_initial_height_m: tsunamiH, tsunami_radius_km: tsunamiR },
-    notes: "Approximate demo calculation"
+    notes: "Rough estimates for educational purposes."
   };
-}
-
-// ---------- /save ----------
-async function handleSave(request, env) {
-  try {
-    const data = await request.json();
-
-    // auto-generate readable filename
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, "-");
-    const random = Math.random().toString(36).slice(2, 8);
-    const objectKey = `impact_${timestamp}_${random}.json`;
-
-    await env.R2_BUCKET.put(objectKey, JSON.stringify(data, null, 2), {
-      httpMetadata: { contentType: "application/json" },
-    });
-
-    return new Response(
-      JSON.stringify({ success: true, key: objectKey }),
-      { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-    );
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ error: e.message }),
-      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-    );
-  }
 }
 
 // ---------- /story ----------
 async function handleStory(request) {
   const s = await request.json();
   const r = s.results || s;
-  const lat = s.input?.impact_lat || null;
-  const lon = s.input?.impact_lon || null;
+  const lat = s.input?.impact_lat;
+  const lon = s.input?.impact_lon;
+  const loc = lat && lon ? ` at (${lat.toFixed(2)}, ${lon.toFixed(2)})` : "";
 
-  const tnt = r.tnt_megatons;
-  const craterKm = (r.crater_diameter_m || 0) / 1000;
-  const tsunamiH = r.tsunami_initial_height_m;
-  const tsunamiR = r.tsunami_radius_km;
-  const mw = r.seismic_mw_equivalent;
+  const tnt = r.tnt_megatons.toFixed(2);
+  const craterKm = (r.crater_diameter_m / 1000).toFixed(2);
+  const tsunamiH = r.tsunami_initial_height_m.toFixed(2);
+  const tsunamiR = r.tsunami_radius_km.toFixed(0);
+  const mw = r.seismic_mw_equivalent.toFixed(2);
 
-  const loc = lat && lon ? ` at (${lat.toFixed(3)}, ${lon.toFixed(3)})` : "";
-  const text = `Impact${loc}: releases ${tnt.toFixed(2)} Mt TNT, forming ~${craterKm.toFixed(2)} km crater, equivalent to M${mw.toFixed(2)} quake, tsunami ${tsunamiH.toFixed(2)} m high reaching ${tsunamiR.toFixed(0)} km.`;
-
+  const text = `Impact${loc}: ${tnt} Mt TNT, crater ~${craterKm} km, magnitude ${mw}, tsunami height ${tsunamiH} m, reach ${tsunamiR} km.`;
   return { story: text };
 }
 
-// ---------- Main Handler ----------
+// ---------- /save ----------
+async function handleSave(request, env) {
+  try {
+    const body = await request.json();
+    const now = new Date();
+    const key = `impact_${now.toISOString().replace(/[:.]/g, "-")}_${Math.random().toString(36).slice(2, 8)}.json`;
+
+    // Ensure R2 binding exists
+    if (!env.R2_BUCKET)
+      return new Response(JSON.stringify({ error: "R2_BUCKET not configured" }), { status: 500 });
+
+    await env.R2_BUCKET.put(key, JSON.stringify(body, null, 2), {
+      httpMetadata: { contentType: "application/json" }
+    });
+
+    return new Response(JSON.stringify({ success: true, key }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+  }
+}
+
+// ---------- MAIN ----------
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const path = url.pathname;
-
     const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -129,20 +122,21 @@ export default {
     };
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
-    if (path === "/simulate" && request.method === "POST")
+    if (url.pathname === "/simulate" && request.method === "POST") {
       return new Response(JSON.stringify(await handleSimulate(request, env)), { headers: { ...cors, "Content-Type": "application/json" } });
-
-    if (path === "/save" && request.method === "POST")
-      return await handleSave(request, env);
-
-    if (path === "/story" && request.method === "POST")
-      return new Response(JSON.stringify(await handleStory(request)), { headers: { ...cors, "Content-Type": "application/json" } });
-
-    if (path === "/" && request.method === "GET") {
-      const html = await fetch("https://erickbm303.github.io/nasa-hackathon-fork/").then(r => r.text());
-      return new Response(html, { headers: { "Content-Type": "text/html" } });
     }
 
-    return new Response(JSON.stringify({ ok: true, endpoints: ["/simulate", "/story", "/save"] }), { headers: { ...cors, "Content-Type": "application/json" } });
+    if (url.pathname === "/story" && request.method === "POST") {
+      return new Response(JSON.stringify(await handleStory(request)), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
+    if (url.pathname === "/save" && request.method === "POST") {
+      return await handleSave(request, env);
+    }
+
+    // Default / root
+    return new Response(JSON.stringify({ message: "Asteroid Impact Simulator API", endpoints: ["/simulate", "/story", "/save"] }), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
   },
 };
