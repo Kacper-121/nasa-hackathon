@@ -11,4 +11,4 @@ bucket_name = "cosmosim-bucket"
 preview_bucket_name = "cosmosim-bucket-preview"
 
 [site]
-bucket = "./public"   # Folder that contains your index.html, script.js, etc.
+bucket = "./public"
